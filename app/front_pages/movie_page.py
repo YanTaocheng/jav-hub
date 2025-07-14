@@ -8,9 +8,14 @@ from modules.javdb.javdb import JavDbUtil
 logger = logging.getLogger(__name__)
 
 
-
-actor_name = st.session_state["current_actor_name"]
-actor_id = st.session_state["current_actor_id"]
+if "current_actor_name" in st.session_state:
+    actor_name = st.session_state["current_actor_name"]
+else:
+    actor_name = ""
+if "current_actor_id" in st.session_state:
+    actor_id = st.session_state["current_actor_id"]
+else:
+    actor_id = ""
 
 if actor_name and actor_id:
     jav_db = JavDbUtil(os.environ["proxy"])
@@ -26,24 +31,32 @@ if actor_name and actor_id:
         col_cyc = cycle(st.columns(4))
         count_cyc = count()
         for movie in movies:
-            with next(col_cyc):
-                st.image(image=movie.get("img"), caption=f'{movie.get("id")}', use_container_width=True)
-                # if st.button(movie.get("id"), key=next(count_cyc), type="tertiary"):
-                #     pass
-                if st.button(label="获取磁链", key=next(count_cyc), type="tertiary"):
+            # logger.info(movie)
+            with next(col_cyc).container(border=True):
+                with st.container(border=False):
+                    st.image(image=movie.get("img"), caption=f'{movie.get("id")} {movie.get("title")}', use_container_width=True)
+                if "磁鏈" in movie.get("tag", ""):
+                    disabled = False
+                    tag =  movie.get("tag", "")
+                else:
+                    disabled = True
+                    tag = "无磁链"
+                if st.button(label=tag, key=next(count_cyc), type="tertiary", disabled=disabled):
                     code, magent_info = jav_db.get_av_by_javdb_id(movie.get("jav_id"), True, True)
-                    logger.info(magent_info)
+                    # logger.info(magent_info)
                     if magent:=magent_info.get("magnets"):
                         st.success(magent[0]["link"])
                     else:
                         st.warning("未获取到磁链")
-        pre_page, current_page, next_page = st.columns([1,2,1])
+        _, pre_page, current_page, next_page, __ = st.columns([1,1,1,1,1])
         with pre_page:
             if st.button("上一页") and st.session_state.actor_current_page > 1:
                 st.session_state.actor_current_page -= 1
+                st.rerun()
         with next_page:
             if st.button("下一页") and st.session_state.actor_current_page < st.session_state.actor_max_page:
                 st.session_state.actor_current_page += 1
+                st.rerun()
         with current_page:
             st.write(f"第 {st.session_state.actor_current_page} 页 / 共 {st.session_state.actor_max_page} 页")
 

@@ -27,4 +27,5 @@ pages = {
         
     ]
 }
+st.set_page_config(layout="wide")
 st.navigation(pages).run()

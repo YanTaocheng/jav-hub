@@ -14,11 +14,11 @@ from typing import Optional, Union, Tuple, List, Any, Dict
 from bs4 import BeautifulSoup
 from anti_useragent import UserAgent
 
-try:
-    from utils.http import RequestUtils
-    from schemas.javdb import JavActor
-except:
-    pass
+# try:
+#     from utils.http import RequestUtils
+#     from schemas.javdb import JavActor
+# except:
+#     pass
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,20 @@ class Link(BaseModel):
     link_meta: str=""
     link_tags: str=""
     link_date: str=""
+
+class JavActor(BaseModel):
+    # javdb上的id
+    id: str
+    # javdb上的演员名
+    name: str
+    # javdb上的所有曾用演员名
+    names: Union[str, list]
+    # 自定义名称
+    custom_name: Optional[str] = ""
+    # 头像链接
+    avatar: Optional[str] = ""
+    # 演员类型
+    type: Optional[str] = ""
 
 # class JavDB:
 #     def __init__(self,
@@ -403,14 +417,21 @@ class JavDbUtil(BaseUtil):
             return code, None
         try:
             soup = self.get_soup(resp)
-            last_page = int(
-                soup.find(class_="pagination-list").find_all("li")[-1].a.text
-            )
-            if not last_page:
-                return 404, None
+            if pagination_list := soup.find(class_="pagination-list"):
+                try:
+                    last_page = int(
+                        pagination_list.find_all("li")[-1].a.text
+                    )
+                except:
+                    temp_page = int(
+                        pagination_list.find_all("li")[-2].a.text
+                    )
+                    return self.get_max_page(re.sub("page=.+", f"page={temp_page}", url))
+            else:
+                last_page = 1
             return 200, last_page
         except Exception as e:
-            # self.log.error(f"JavDbUtil: 从 {url} 获取最大页数: {e}")
+            self.log.error(f"JavDbUtil: 从 {url} 获取最大页数: {e}")
             return 200, 1
 
     def get_new_ids(self) -> Tuple[int, any]:
@@ -464,13 +485,20 @@ class JavDbUtil(BaseUtil):
                     score = score_search.group(1).strip()
                 else:
                     score = "NA"
+
+                if tag_node := item.find(class_="tags has-addons").find("span"):
+                    tag = tag_node.text.strip()
+                else:
+                    tag = ""
+                
                 id_details.append({
                     "id": item.find(class_="video-title").strong.text.strip(),
                     "jav_id": item.find("a")["href"].split("/")[-1],
                     "date": item.find(class_="meta").text.strip(),
                     "title": item.find("a")["title"].strip(),
                     "score": score,
-                    "img": item.find("img")["src"]
+                    "img": item.find("img")["src"],
+                    "tag": tag
                 })
 
             # ids = [
@@ -924,9 +952,7 @@ class JavDbUtil(BaseUtil):
                 title, title_cn = title_cn, ""
             av["title_cn"] = title_cn.text.strip() if title_cn else ""
             av["title"] = title.text.strip() if title else ""
-            av["img"] = soup.find("div", {"class": "column column-video-cover"}).find(
-                "img"
-            )["src"]
+            av["img"] = soup.find("div", {"class": "column column-video-cover"}).find("img")["src"]
             # 由于nav栏会因为实际信息不同而导致行数不同，所以只能用循环的方式检索信息
             metainfos = soup.find("nav", {"class": "panel movie-panel-info"}).find_all(
                 "div", {"class": "panel-block"}
@@ -1100,9 +1126,58 @@ class JavDbUtil(BaseUtil):
                                                                 names = actor_box.xpath("./a/@title")[0],
                                                                 avatar = actor_box.xpath("./a/figure/img/@src")[0]
                                                             ))
-        logger.info(actors)
         return actors
 
+    def get_actors_by_type(self, actor_type: str, page: int) -> list[JavActor]|None:
+        """根据分类获取演员信息
+
+        Args:
+            actor_type (str): 演员类型, censored/uncensored/western
+
+        Returns:
+            list[JavActor]: 演员信息
+        """
+        actors: list[JavActor] = []
+
+        if page == 1:
+            endpoint = f"{self.base_url_actor}{actor_type}"
+        else:
+            endpoint = f"{self.base_url_actor}{actor_type}?page={page}"
+
+        code, resp = self.send_req(url=endpoint)
+        if code != 200:
+            return None
+        
+        try:
+            soup = self.get_soup(resp)
+            actor_boxes = soup.find_all(class_="box actor-box")
+            if actor_boxes:
+                for actor_box in soup.find_all(class_="box actor-box"):
+                    actors.append(JavActor(
+                                            id = actor_box.find("a").attrs["href"].split("/")[-1],
+                                            name = actor_box.find("strong").text.strip(),
+                                            names = actor_box.find("a").attrs["title"],
+                                            avatar = actor_box.find("img").attrs["src"]
+                                        ))
+                return actors
+            else:
+                return []
+        except:
+            return None
+
+        res = self.request.get_res(url=endpoint)
+        formated_res = fromstring(res.text)
+
+        for actor_box in formated_res.xpath('.//div[@class="box actor-box"]'):
+            actors.append(JavActor(
+                                    id = actor_box.xpath("./a/@href")[0].replace("/actors/", ""),
+                                    name = actor_box.xpath("./a/strong")[0].text_content().replace("\n", "").replace(" ", ""),
+                                    names = actor_box.xpath("./a/@title")[0],
+                                    avatar = actor_box.xpath("./a/figure/img/@src")[0],
+                                    type = actor_type
+                                ))
+        logger.info(actors)
+        return actors
 
 
 if __name__ == "__main__":
