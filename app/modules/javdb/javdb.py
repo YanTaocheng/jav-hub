@@ -537,19 +537,24 @@ class JavDbUtil(BaseUtil):
         """
         code, resp = self.send_req(url=self.base_url_search_star + text)
         if code != 200:
-            return code, None
+            return []
         try:
             soup = self.get_soup(resp)
-            actor_boxs = soup.find_all(class_="actor-box")
-            names = [box.find("a")["title"] for box in actor_boxs]
-            if not names:
-                return 404, None
-            names = [name.split(",")[0] for name in names]
-            names = list(set(names))
-            return 200, names
+            actor_boxes = soup.find_all(class_="box actor-box")
+            actors = []
+            if actor_boxes:
+                for actor_box in soup.find_all(class_="box actor-box"):
+                    actors.append(JavActor(
+                                            id = actor_box.find("a").attrs["href"].split("/")[-1],
+                                            name = actor_box.find("strong").text.strip(),
+                                            names = actor_box.find("a").attrs["title"],
+                                            avatar = actor_box.find("img").attrs["src"]
+                                        ))
+                return actors
+            return []
         except Exception as e:
             self.log.error(f"JavDbUtil: 模糊搜索演员: {e}")
-            return 404, None
+            return []
 
     def get_id_by_star_name(
         self, star_name: str, page=-1
@@ -1164,20 +1169,6 @@ class JavDbUtil(BaseUtil):
                 return []
         except:
             return None
-
-        res = self.request.get_res(url=endpoint)
-        formated_res = fromstring(res.text)
-
-        for actor_box in formated_res.xpath('.//div[@class="box actor-box"]'):
-            actors.append(JavActor(
-                                    id = actor_box.xpath("./a/@href")[0].replace("/actors/", ""),
-                                    name = actor_box.xpath("./a/strong")[0].text_content().replace("\n", "").replace(" ", ""),
-                                    names = actor_box.xpath("./a/@title")[0],
-                                    avatar = actor_box.xpath("./a/figure/img/@src")[0],
-                                    type = actor_type
-                                ))
-        logger.info(actors)
-        return actors
 
 
 if __name__ == "__main__":

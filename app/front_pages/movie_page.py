@@ -17,17 +17,25 @@ if "current_actor_id" in st.session_state:
 else:
     actor_id = ""
 
-if actor_name and actor_id:
-    jav_db = JavDbUtil(os.environ["proxy"])
-    if "actor_max_page" not in st.session_state: 
-        code, max_page = jav_db.get_max_page(jav_db.base_url_actor+actor_id+"?page=1")
-        st.session_state.actor_current_page = 1
-        st.session_state.actor_max_page = max_page if max_page else 1
+if not actor_id or not actor_name:
+    actor_id = os.getenv("current_actor_id")
+    actor_name = os.getenv("current_actor_name")
 
-    movie_tab = st.tabs([actor_name])[0]
+if actor_name and actor_id:
+    os.environ["current_actor_id"] = actor_id
+    os.environ["current_actor_name"] = actor_name
+    jav_db = JavDbUtil(os.environ["proxy"])
+    if "movie_current_page" not in st.session_state:
+        st.session_state.movie_current_page = 1
+    # if "movie_max_page" not in st.session_state: 
+    #     code, max_page = jav_db.get_max_page(jav_db.base_url_actor+actor_id+"?page=1")
+    #     st.session_state.movie_current_page = 1
+    #     st.session_state.movie_max_page = max_page if max_page else 1
+
+    movie_tab = st.tabs([f"KK最爱的 {actor_name} 老师"])[0]
 
     with movie_tab:
-        code, movies = jav_db.get_id_details_by_star_id(actor_id, st.session_state.actor_current_page)
+        code, movies = jav_db.get_id_details_by_star_id(actor_id, st.session_state.movie_current_page)
         col_cyc = cycle(st.columns(4))
         count_cyc = count()
         for movie in movies:
@@ -50,13 +58,13 @@ if actor_name and actor_id:
                         st.warning("未获取到磁链")
         _, pre_page, current_page, next_page, __ = st.columns([1,1,1,1,1])
         with pre_page:
-            if st.button("上一页") and st.session_state.actor_current_page > 1:
-                st.session_state.actor_current_page -= 1
+            if st.button("上一页", key="movie_pre_button", disabled=True if st.session_state.movie_current_page==1 else False):
+                st.session_state.movie_current_page -= 1
                 st.rerun()
         with next_page:
-            if st.button("下一页") and st.session_state.actor_current_page < st.session_state.actor_max_page:
-                st.session_state.actor_current_page += 1
+            if st.button("下一页", key="movie_next_button", disabled=True if len(movies)!=40 else False):
+                st.session_state.movie_current_page += 1
                 st.rerun()
         with current_page:
-            st.write(f"第 {st.session_state.actor_current_page} 页 / 共 {st.session_state.actor_max_page} 页")
+            st.write(f"当前第 {st.session_state.movie_current_page} 页")
 
