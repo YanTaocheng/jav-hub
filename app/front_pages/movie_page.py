@@ -46,8 +46,7 @@ if actor_name and actor_id:
                         magent = magent_result[0]["link"]
 
                 st.markdown(
-                    f':blue[**{movie.get("id")}** {movie.get("title")}]',
-                    width="content"
+                    f':blue[**{movie.get("id")}** {movie.get("title")}]'
                 )
                 left, center, right , _ = st.columns([1,1,1,1])
                 with left:
