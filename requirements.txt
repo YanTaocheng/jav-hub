@@ -13,3 +13,4 @@ attrs>=23.2.0
 beautifulsoup4>=4.11.2
 streamlit-extras
 streamlit_option_menu
+streamlit-image-coordinates
